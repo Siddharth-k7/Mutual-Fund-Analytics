@@ -66,11 +66,22 @@ Open it in Power BI Desktop to inspect the report locally.
 
 Optional publishing to Power BI Service or Tableau Public was not completed in this environment, so no hosted dashboard URL is available yet.
 
+## Repository Layout
+
+- `data/raw/` - original source files
+- `data/processed/` - cleaned CSV outputs
+- `data/db/` - local SQLite database, ignored by Git
+- `notebooks/` - analysis notebooks
+- `scripts/` - submission-facing ETL and utility entrypoints
+- `sql/` - schema and query files
+- `dashboard/` - Power BI dashboard file
+- `reports/` - final PDF report and slide deck copies
+
 ## Final Deliverables
 
 - `Final_Report.pdf`
 - `Bluestock_MF_Presentation.pptx`
-- `bluestock_mf.db`
+- `data/db/bluestock_mf.db`
 - `data/processed/`
 
 ## Dataset Descriptions
@@ -91,4 +102,3 @@ Optional publishing to Power BI Service or Tableau Public was not completed in t
 - `run_pipeline.py` is the master entrypoint for local refreshes.
 - `day2_pipeline.py` contains the warehouse cleaning and load logic.
 - `recommender.py` returns scheme suggestions by risk appetite.
-

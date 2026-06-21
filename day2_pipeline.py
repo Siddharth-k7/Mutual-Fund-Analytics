@@ -11,7 +11,8 @@ from sqlalchemy import create_engine, text
 ROOT = Path(__file__).resolve().parent
 RAW_DIR = ROOT / "data" / "raw"
 PROCESSED_DIR = ROOT / "data" / "processed"
-DB_PATH = ROOT / "bluestock_mf.db"
+DB_DIR = ROOT / "data" / "db"
+DB_PATH = DB_DIR / "bluestock_mf.db"
 SCHEMA_PATH = ROOT / "schema.sql"
 QUERIES_PATH = ROOT / "queries.sql"
 DICTIONARY_PATH = ROOT / "data_dictionary.md"
@@ -621,6 +622,7 @@ def write_sql_files() -> None:
 def load_sqlite(load_frames: dict[str, pd.DataFrame]) -> pd.DataFrame:
     """Create a fresh SQLite database and load the schema and facts."""
 
+    DB_DIR.mkdir(parents=True, exist_ok=True)
     if DB_PATH.exists():
         DB_PATH.unlink()
     engine = create_engine(f"sqlite:///{DB_PATH}")
