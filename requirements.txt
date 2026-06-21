@@ -1,3 +1,7 @@
 requests
 pandas
 SQLAlchemy
+matplotlib
+Pillow
+reportlab
+PyMuPDF

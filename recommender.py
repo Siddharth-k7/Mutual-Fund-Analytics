@@ -1,4 +1,4 @@
-"""Simple mutual fund recommender based on risk appetite and Sharpe ratio."""
+"""Simple mutual-fund recommender based on risk appetite and Sharpe ratio."""
 from __future__ import annotations
 
 import argparse
@@ -17,6 +17,8 @@ RISK_MAP = {
 
 
 def recommend_funds(risk_appetite: str, top_n: int = 3) -> pd.DataFrame:
+    """Return the strongest funds for a requested risk bucket."""
+
     risk_key = risk_appetite.strip().lower()
     if risk_key not in RISK_MAP:
         raise ValueError("risk_appetite must be one of: Low, Moderate, High")
@@ -45,6 +47,8 @@ def recommend_funds(risk_appetite: str, top_n: int = 3) -> pd.DataFrame:
 
 
 def main() -> None:
+    """Run the recommender from the command line."""
+
     parser = argparse.ArgumentParser(description="Recommend funds by risk appetite.")
     parser.add_argument("--risk", help="Low, Moderate, or High")
     parser.add_argument("--top-n", type=int, default=3)

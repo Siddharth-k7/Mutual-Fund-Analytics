@@ -1,23 +1,12 @@
-"""Utilities to load processed CSVs from MFA/data/processed.
+"""Utilities for reading cleaned CSVs from `MFA/data/processed/`.
 
-Provides:
-  - `PROCESSED_DIR` path constant
-  - `list_processed_files()` -> list[str]
-  - `load_processed_csv(name, **pd.read_csv kwargs)` -> pd.DataFrame
-  - `load_all_processed()` -> dict[name, DataFrame]
-
-Usage:
-    from load_processed import load_processed_csv
-    fm = load_processed_csv("01_fund_master.csv", parse_dates=["launch_date"])
-    nav = load_processed_csv("02_nav_history.csv", parse_dates=["date"])
-
-The module expects the processed files under `MFA/data/processed/` (relative
-to this file). It raises a clear FileNotFoundError if the folder is missing.
+The helpers keep notebook and ad-hoc analysis code consistent by centralizing
+path resolution and file existence checks.
 """
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Iterable, Dict, List
+from typing import Iterable
 
 import pandas as pd
 
@@ -26,6 +15,8 @@ PROCESSED_DIR = ROOT / "data" / "processed"
 
 
 def _ensure_dir() -> None:
+    """Raise a clear error when the processed directory is missing."""
+
     if not PROCESSED_DIR.exists():
         raise FileNotFoundError(
             f"Processed data directory not found: {PROCESSED_DIR!s}.\n"
@@ -33,8 +24,9 @@ def _ensure_dir() -> None:
         )
 
 
-def list_processed_files() -> List[str]:
-    """Return sorted list of CSV file names in the processed directory."""
+def list_processed_files() -> list[str]:
+    """Return the sorted CSV inventory from the processed directory."""
+
     _ensure_dir()
     return sorted([p.name for p in PROCESSED_DIR.glob("*.csv")])
 
@@ -64,7 +56,7 @@ def load_processed_csv(name: str, **read_csv_kwargs) -> pd.DataFrame:
     return pd.read_csv(path, **read_csv_kwargs)
 
 
-def load_all_processed(names: Iterable[str] | None = None, **common_read_kwargs) -> Dict[str, pd.DataFrame]:
+def load_all_processed(names: Iterable[str] | None = None, **common_read_kwargs) -> dict[str, pd.DataFrame]:
     """Load multiple processed CSVs.
 
     - If `names` is None, loads all CSVs found in the processed dir.
@@ -75,7 +67,7 @@ def load_all_processed(names: Iterable[str] | None = None, **common_read_kwargs)
     files = list_processed_files() if names is None else [
         (name if name.endswith(".csv") else f"{name}.csv") for name in names
     ]
-    out: Dict[str, pd.DataFrame] = {}
+    out: dict[str, pd.DataFrame] = {}
     for fname in files:
         out[fname] = pd.read_csv(PROCESSED_DIR / fname, **common_read_kwargs)
     return out

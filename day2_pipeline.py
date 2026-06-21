@@ -1,3 +1,5 @@
+"""Clean, validate, and load the Bluestock mutual-fund data warehouse."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -38,20 +40,28 @@ TRANSACTION_TYPES = {
 
 
 def date_key(series: pd.Series) -> pd.Series:
+    """Convert a date-like series to integer keys in YYYYMMDD format."""
+
     return pd.to_datetime(series).dt.strftime("%Y%m%d").astype("int64")
 
 
 def clean_string_columns(df: pd.DataFrame) -> pd.DataFrame:
+    """Trim whitespace from every string-like column in a dataframe."""
+
     for column in df.select_dtypes(include=["object", "string"]).columns:
         df[column] = df[column].astype("string").str.strip()
     return df
 
 
 def read_csv(name: str) -> pd.DataFrame:
+    """Read a raw CSV from `data/raw/` and normalize string columns."""
+
     return clean_string_columns(pd.read_csv(RAW_DIR / name))
 
 
 def clean_fund_master() -> pd.DataFrame:
+    """Validate and standardize the scheme master dimension."""
+
     df = read_csv("01_fund_master.csv")
     df["amfi_code"] = pd.to_numeric(df["amfi_code"], errors="raise").astype("int64")
     df["launch_date"] = pd.to_datetime(df["launch_date"], errors="raise").dt.date.astype("string")
@@ -70,6 +80,8 @@ def clean_fund_master() -> pd.DataFrame:
 
 
 def clean_nav_history() -> pd.DataFrame:
+    """Build a daily NAV fact table with weekend and holiday forward-fill."""
+
     df = read_csv("02_nav_history.csv")
     df["amfi_code"] = pd.to_numeric(df["amfi_code"], errors="raise").astype("int64")
     df["date"] = pd.to_datetime(df["date"], errors="raise")
@@ -95,6 +107,8 @@ def clean_nav_history() -> pd.DataFrame:
 
 
 def clean_aum_by_fund_house() -> pd.DataFrame:
+    """Standardize the fund-house AUM snapshots."""
+
     df = read_csv("03_aum_by_fund_house.csv")
     df["date"] = pd.to_datetime(df["date"], errors="raise")
     df["date_key"] = date_key(df["date"])
@@ -106,6 +120,8 @@ def clean_aum_by_fund_house() -> pd.DataFrame:
 
 
 def clean_monthly_sip_inflows() -> pd.DataFrame:
+    """Normalize the monthly SIP inflow fact table."""
+
     df = read_csv("04_monthly_sip_inflows.csv")
     df["month"] = pd.to_datetime(df["month"], format="%Y-%m", errors="raise")
     df["date_key"] = date_key(df["month"])
@@ -116,6 +132,8 @@ def clean_monthly_sip_inflows() -> pd.DataFrame:
 
 
 def clean_category_inflows() -> pd.DataFrame:
+    """Prepare the monthly category net-inflow fact table."""
+
     df = read_csv("05_category_inflows.csv")
     df["month"] = pd.to_datetime(df["month"], format="%Y-%m", errors="raise")
     df["date_key"] = date_key(df["month"])
@@ -126,6 +144,8 @@ def clean_category_inflows() -> pd.DataFrame:
 
 
 def clean_industry_folio_count() -> pd.DataFrame:
+    """Normalize the monthly industry folio counts."""
+
     df = read_csv("06_industry_folio_count.csv")
     df["month"] = pd.to_datetime(df["month"], format="%Y-%m", errors="raise")
     df["date_key"] = date_key(df["month"])
@@ -136,6 +156,8 @@ def clean_industry_folio_count() -> pd.DataFrame:
 
 
 def clean_scheme_performance() -> pd.DataFrame:
+    """Validate scheme performance metrics and flag obvious anomalies."""
+
     df = read_csv("07_scheme_performance.csv")
     df["amfi_code"] = pd.to_numeric(df["amfi_code"], errors="raise").astype("int64")
     for column in RETURN_COLUMNS + ["aum_crore", "expense_ratio_pct", "morningstar_rating"]:
@@ -160,6 +182,8 @@ def clean_scheme_performance() -> pd.DataFrame:
 
 
 def clean_investor_transactions() -> pd.DataFrame:
+    """Clean investor transaction records and enforce business rules."""
+
     df = read_csv("08_investor_transactions.csv")
     df["transaction_date"] = pd.to_datetime(df["transaction_date"], errors="raise")
     df["date_key"] = date_key(df["transaction_date"])
@@ -183,6 +207,8 @@ def clean_investor_transactions() -> pd.DataFrame:
 
 
 def clean_portfolio_holdings() -> pd.DataFrame:
+    """Standardize portfolio holdings at the fund/date/security grain."""
+
     df = read_csv("09_portfolio_holdings.csv")
     df["amfi_code"] = pd.to_numeric(df["amfi_code"], errors="raise").astype("int64")
     df["portfolio_date"] = pd.to_datetime(df["portfolio_date"], errors="raise")
@@ -195,6 +221,8 @@ def clean_portfolio_holdings() -> pd.DataFrame:
 
 
 def clean_benchmark_indices() -> pd.DataFrame:
+    """Normalize the benchmark index close-value series."""
+
     df = read_csv("10_benchmark_indices.csv")
     df["date"] = pd.to_datetime(df["date"], errors="raise")
     df["date_key"] = date_key(df["date"])
@@ -205,6 +233,8 @@ def clean_benchmark_indices() -> pd.DataFrame:
 
 
 def build_dim_date(cleaned: dict[str, pd.DataFrame]) -> pd.DataFrame:
+    """Construct a shared calendar dimension from every dated source."""
+
     keys = []
     for df in cleaned.values():
         if "date_key" in df.columns:
@@ -226,6 +256,8 @@ def build_dim_date(cleaned: dict[str, pd.DataFrame]) -> pd.DataFrame:
 
 
 def write_processed_csvs(cleaned: dict[str, pd.DataFrame]) -> None:
+    """Write the cleaned CSV extracts to `data/processed/`."""
+
     PROCESSED_DIR.mkdir(parents=True, exist_ok=True)
     for name, df in cleaned.items():
         df.to_csv(PROCESSED_DIR / name, index=False)
@@ -481,6 +513,8 @@ ORDER BY index_name, year, month;
 
 
 def prepare_load_frames(cleaned: dict[str, pd.DataFrame], dim_date: pd.DataFrame) -> dict[str, pd.DataFrame]:
+    """Project the cleaned dataframes into the SQLite star schema layout."""
+
     dim_fund = cleaned["01_fund_master.csv"].rename(columns={"amfi_code": "fund_key"}).copy()
     dim_fund.insert(1, "amfi_code", dim_fund["fund_key"])
 
@@ -578,11 +612,15 @@ def prepare_load_frames(cleaned: dict[str, pd.DataFrame], dim_date: pd.DataFrame
 
 
 def write_sql_files() -> None:
+    """Persist the schema and query files used by the warehouse."""
+
     SCHEMA_PATH.write_text(SCHEMA_SQL.strip() + "\n", encoding="utf-8")
     QUERIES_PATH.write_text(QUERIES_SQL.strip() + "\n", encoding="utf-8")
 
 
 def load_sqlite(load_frames: dict[str, pd.DataFrame]) -> pd.DataFrame:
+    """Create a fresh SQLite database and load the schema and facts."""
+
     if DB_PATH.exists():
         DB_PATH.unlink()
     engine = create_engine(f"sqlite:///{DB_PATH}")
@@ -609,6 +647,8 @@ def load_sqlite(load_frames: dict[str, pd.DataFrame]) -> pd.DataFrame:
 
 
 def write_data_dictionary(row_counts: pd.DataFrame) -> None:
+    """Generate the Markdown data dictionary for the cleaned warehouse."""
+
     sections = []
     processed_counts = []
     for source_path in sorted(RAW_DIR.glob("[0-9][0-9]_*.csv")):
@@ -762,6 +802,8 @@ This dictionary documents the Day 2 cleaned CSVs and SQLite star schema. Source 
 
 
 def main() -> None:
+    """Run the full cleaning and loading workflow."""
+
     cleaned = {
         "01_fund_master.csv": clean_fund_master(),
         "02_nav_history.csv": clean_nav_history(),
